@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>NN VEHICLE MANAGEMENT</title>
+
+<style>
+body{
+  background:#0f172a;
+  color:#e5e7eb;
+  font-family:'Segoe UI',sans-serif;
+  padding:20px;
+}
+
+h1{
+  text-align:center;
+  color:#facc15;
+  margin-bottom:20px;
+}
+
+.topbar{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:20px;
+}
+
+.logout-btn{
+  background:#ef4444;
+  color:white;
+  border:none;
+  padding:8px 15px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.form-box{
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+
+input,select{
+  padding:10px;
+  border:none;
+  border-radius:6px;
+  background:#334155;
+  color:white;
+}
+
+button{
+  background:#facc15;
+  border:none;
+  padding:10px 15px;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+.stats{
+  display:flex;
+  gap:20px;
+  margin:20px 0;
+}
+
+.card{
+  flex:1;
+  background:#1e293b;
+  padding:15px;
+  border-radius:10px;
+  text-align:center;
+}
+
+.card span{
+  font-size:22px;
+  font-weight:bold;
+  color:#facc15;
+}
+
+table{
+  width:100%;
+  margin-top:20px;
+  border-collapse:collapse;
+  background:#1e293b;
+  border-radius:10px;
+  overflow:hidden;
+}
+
+th{
+  background:#334155;
+}
+
+td,th{
+  padding:12px;
+  text-align:center;
+}
+
+tr:nth-child(even){
+  background:#0f172a;
+}
+
+.search-box{
+  margin-top:15px;
+}
+
+.edit-btn{
+  background:#22c55e;
+  color:white;
+  margin:2px;
+}
+
+.delete-btn{
+  background:#ef4444;
+  color:white;
+  margin:2px;
+}
+
+button:hover{
+  opacity:0.8;
+}
+</style>
+
+<style>
+.chart-container{
+  width: 100%;
+  height: 350px;
+  margin: 70px 0;
+}
+</style>
+
+</head>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<body>
+
+<div class="topbar">
+  <h1>🚗 NN VEHICLE MANAGEMENT</h1>
+  <a href="/logout"><button class="logout-btn">Logout</button></a>
+</div>
+
+<div class="form-box">
+  <input id="m-make" placeholder="Make">
+  <input id="m-model" placeholder="Model">
+  <input id="m-year" placeholder="Year">
+  <input id="m-vin" placeholder="VIN">
+  <input id="m-price" placeholder="Price">
+
+  <select id="status">
+    <option value="available">Available</option>
+    <option value="sold">Sold</option>
+  </select>
+
+  <button onclick="saveVehicle()">Save</button>
+</div>
+
+<div class="stats">
+  <div class="card">Total <br><span id="total"></span></div>
+  <div class="card">Available <br><span id="available"></span></div>
+  <div class="card">Sold <br><span id="sold"></span></div>
+</div>
+
+<div class="chart-container">
+  <canvas id="chart"></canvas>
+</div>
+
+<div class="search-box">
+  <input id="search" placeholder="🔍 Search vehicle..." onkeyup="render()">
+</div>
+<table>
+<thead>
+<tr>
+<th>#</th><th>Make</th><th>Model</th><th>Year</th><th>VIN</th><th>Price</th><th>Status</th><th>Action</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+
+<script>
+
+  let chart;
+
+function updateDashboard(){
+  document.getElementById('total').innerText = vehicles.length;
+  document.getElementById('available').innerText = vehicles.filter(v=>v.status==='available').length;
+  document.getElementById('sold').innerText = vehicles.filter(v=>v.status==='sold').length;
+
+  const ctx = document.getElementById('chart');
+
+  if(chart){
+    chart.destroy();
+  }
+
+  chart = new Chart(ctx, {
+  type: 'bar',
+  data: {
+    labels: ['Total', 'Available', 'Sold'],
+    datasets: [{
+      label: 'Vehicles',
+      data: [
+        vehicles.length,
+        vehicles.filter(v=>v.status==='available').length,
+        vehicles.filter(v=>v.status==='sold').length
+      ],
+      backgroundColor: ['#06b6d4','#06b6d4','#06b6d4'],
+      barThickness: 70   // 🔥 reduced width
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 1200,
+      easing: 'easeOutQuart'
+    },
+    scales: {
+      y: {
+        beginAtZero: true
+      }
+    }
+  }
+});
+}
+
+// ================= CLEAN DATABASE =================
+let vehicles = [];
+let editId = null;
+
+// ================= LOAD =================
+async function loadData(){
+  const res = await fetch('/api/vehicles');
+  vehicles = await res.json();
+  render();
+  updateDashboard(); // 👈 ADD THIS
+}
+
+// ================= RENDER =================
+function render(){
+  const t = document.getElementById('tbody');
+  t.innerHTML = '';
+
+  const search = document.getElementById('search').value.toLowerCase();
+
+  vehicles
+  .filter(v =>
+    v.make.toLowerCase().includes(search) ||
+    v.model.toLowerCase().includes(search) ||
+    v.vin.toLowerCase().includes(search)
+  )
+  .forEach((v,i)=>{
+    t.innerHTML += `
+    <tr>
+      <td>${i+1}</td>
+      <td>${v.make}</td>
+      <td>${v.model}</td>
+      <td>${v.year}</td>
+      <td>${v.vin}</td>
+      <td>${v.price}</td>
+<td style="color:${v.status==='sold' ? 'red' : 'lightgreen'}">
+  ${v.status}
+</td>
+      <td>
+        <button class="edit-btn" onclick="editVehicle(${v.id})">Edit</button>
+        <button class="delete-btn" onclick="deleteVehicle(${v.id})">Delete</button>
+      </td>
+    </tr>`;
+  });
+}
+// ================= SAVE =================
+async function saveVehicle(){
+  const v = {
+  make: document.getElementById('m-make').value,
+  model: document.getElementById('m-model').value,
+  year: parseInt(document.getElementById('m-year').value),
+  vin: document.getElementById('m-vin').value,
+  price: parseInt(document.getElementById('m-price').value),
+  status: document.getElementById('status').value
+};
+
+  if(editId === null){
+    await fetch('/api/vehicles',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(v)
+    });
+  }else{
+    await fetch('/api/vehicles/'+editId,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(v)
+    });
+    editId = null;
+  }
+
+alert("Vehicle saved successfully!");
+clearForm();
+loadData();
+}
+
+// ================= DELETE =================
+async function deleteVehicle(id){
+  if(confirm("Are you sure to delete this vehicle?")){
+    await fetch('/api/vehicles/'+id,{method:'DELETE'});
+    loadData();
+  }
+}
+
+// ================= EDIT =================
+function editVehicle(id){
+  const v = vehicles.find(x=>x.id===id);
+
+  document.getElementById('m-make').value = v.make;
+  document.getElementById('m-model').value = v.model;
+  document.getElementById('m-year').value = v.year;
+  document.getElementById('m-vin').value = v.vin;
+  document.getElementById('m-price').value = v.price;
+  document.getElementById('status').value = v.status || 'available';
+
+  editId = id;
+}
+
+// ================= CLEAR =================
+function clearForm(){
+  document.getElementById('m-make').value='';
+  document.getElementById('m-model').value='';
+  document.getElementById('m-year').value='';
+  document.getElementById('m-vin').value='';
+  document.getElementById('m-price').value='';
+  document.getElementById('status').value = 'available';
+}
+
+// ================= START =================
+loadData();
+
+</script>
+
+</body>
+</html>
