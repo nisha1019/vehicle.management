@@ -1,0 +1,1 @@
+{"vehicles": [{"make": "ff", "model": "rt", "year": 1234, "vin": "12345", "price": 123456, "status": "sold", "id": 2}, {"make": "bmw", "model": "m5", "year": 2006, "vin": "12345", "price": 80000, "status": "available", "id": 3}]}
